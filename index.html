@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#050505" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Chit-Chat — Real Conversations. Zero Barriers.</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="icon.jpg" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="brand">
+        <img src="icon.jpg" alt="Chit-Chat" class="brand-icon" onerror="this.style.display='none'" />
+        <div>
+          <div class="brand-name">Chit-Chat</div>
+          <div class="brand-tag">Talk. HUH? Understood.</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="modeIndicator" class="pill online">Online</button>
+        <button id="menuBtn" class="icon-btn">☰</button>
+      </div>
+    </header>
+
+    <!-- Feature chips -->
+    <div class="feature-chips">
+      <span class="chip active" data-mode="face">Face-to-Face</span>
+      <span class="chip" data-mode="group">Group</span>
+      <span class="chip" data-mode="call">Call</span>
+      <span class="chip" data-mode="continuous">Continuous</span>
+    </div>
+
+    <!-- Status -->
+    <div class="status-row">
+      <div class="status-left">
+        <span id="statusDot" class="dot ready"></span>
+        <span id="statusText">Ready · Hybrid Online + Offline</span>
+      </div>
+      <span id="latency" class="latency">—</span>
+    </div>
+
+    <!-- Language selectors -->
+    <div class="lang-row">
+      <div class="lang-card">
+        <span class="lang-label">You speak</span>
+        <select id="sourceLang">
+          <option value="en-US">English</option>
+          <option value="es-ES">Spanish</option>
+          <option value="fr-FR">French</option>
+          <option value="de-DE">German</option>
+          <option value="it-IT">Italian</option>
+          <option value="pt-BR">Portuguese</option>
+          <option value="zh-CN">Chinese</option>
+          <option value="ja-JP">Japanese</option>
+          <option value="ko-KR">Korean</option>
+          <option value="ar-SA">Arabic</option>
+          <option value="hi-IN">Hindi</option>
+          <option value="ru-RU">Russian</option>
+          <option value="th-TH">Thai</option>
+          <option value="vi-VN">Vietnamese</option>
+          <option value="id-ID">Indonesian</option>
+        </select>
+      </div>
+      <button id="swapBtn" class="swap">⇄</button>
+      <div class="lang-card">
+        <span class="lang-label">They hear</span>
+        <select id="targetLang">
+          <option value="es-ES">Spanish</option>
+          <option value="en-US">English</option>
+          <option value="fr-FR">French</option>
+          <option value="de-DE">German</option>
+          <option value="it-IT">Italian</option>
+          <option value="pt-BR">Portuguese</option>
+          <option value="zh-CN">Chinese</option>
+          <option value="ja-JP">Japanese</option>
+          <option value="ko-KR">Korean</option>
+          <option value="ar-SA">Arabic</option>
+          <option value="hi-IN">Hindi</option>
+          <option value="ru-RU">Russian</option>
+          <option value="th-TH">Thai</option>
+          <option value="vi-VN">Vietnamese</option>
+          <option value="id-ID">Indonesian</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Dual transcript -->
+    <div class="transcripts">
+      <div class="bubble you">
+        <div class="bubble-meta">You</div>
+        <div id="sourceText" class="bubble-text muted">Hold the button and speak naturally…</div>
+      </div>
+      <div class="bubble them">
+        <div class="bubble-meta">Translation · <span id="modeTag">Online</span> · <span id="voiceTag">System Voice</span></div>
+        <div id="targetText" class="bubble-text muted">Translation will appear here in real time</div>
+      </div>
+    </div>
+
+    <!-- Main action -->
+    <div class="action-zone">
+      <button id="speakBtn" class="speak">
+        <div class="speak-inner">
+          <span class="mic">🎤</span>
+          <span class="speak-label">Hold to Speak</span>
+        </div>
+      </button>
+      <p class="hint">Continuous streaming mode available · Online or Offline</p>
+    </div>
+
+    <!-- Capability bar -->
+    <div class="capability-bar">
+      <div class="cap"><span class="cap-icon">⚡</span><span>Sub-second</span></div>
+      <div class="cap"><span class="cap-icon">🔒</span><span>Privacy</span></div>
+      <div class="cap"><span class="cap-icon">📶</span><span>Hybrid</span></div>
+      <div class="cap"><span class="cap-icon">🗣️</span><span>Voice</span></div>
+    </div>
+
+    <!-- Bottom nav -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-panel="main">Talk</button>
+      <button class="nav-item" data-panel="history">History</button>
+      <button class="nav-item" data-panel="features">Features</button>
+      <button class="nav-item" data-panel="settings">Settings</button>
+    </nav>
+
+    <!-- History panel -->
+    <div id="historyPanel" class="overlay hidden">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h2>Conversation History</h2>
+          <button class="close" data-close="historyPanel">×</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+        <button id="clearHistory" class="danger">Clear All</button>
+      </div>
+    </div>
+
+    <!-- Features panel (showcases the full 2026 vision) -->
+    <div id="featuresPanel" class="overlay hidden">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h2>2026 Feature Set</h2>
+          <button class="close" data-close="featuresPanel">×</button>
+        </div>
+        <div class="feature-grid">
+          <div class="feat"><strong>✅ Hold-to-Speak</strong><span>Working now – real microphone</span></div>
+          <div class="feat"><strong>✅ Online Translation</strong><span>Working now – free public APIs</span></div>
+          <div class="feat"><strong>✅ Offline Phrases</strong><span>Working now – built-in dictionary</span></div>
+          <div class="feat"><strong>✅ Hybrid Toggle</strong><span>Working now – Online / Offline switch</span></div>
+          <div class="feat"><strong>✅ Text-to-Speech</strong><span>Working now – browser voices</span></div>
+          <div class="feat"><strong>✅ Continuous Mode</strong><span>Working now – auto-restart listening</span></div>
+          <div class="feat"><strong>🔒 Voice Cloning</strong><span>Production – needs ElevenLabs / OpenAI</span></div>
+          <div class="feat"><strong>🔒 True Live S2S</strong><span>Production – needs Realtime API</span></div>
+          <div class="feat"><strong>🔒 Group Mode</strong><span>Production – needs server</span></div>
+          <div class="feat"><strong>🔒 Call Mode</strong><span>Production – needs telephony / WebRTC</span></div>
+        </div>
+        <p class="feat-note">Green items work in this free browser version. Lock items require paid AI APIs + a small backend. See PRODUCTION.md for the exact path.</p>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div id="settingsPanel" class="overlay hidden">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h2>Settings</h2>
+          <button class="close" data-close="settingsPanel">×</button>
+        </div>
+        <label class="setting"><span>Auto-speak translation</span><input type="checkbox" id="autoSpeak" checked /></label>
+        <label class="setting"><span>Show latency</span><input type="checkbox" id="showLatency" checked /></label>
+        <label class="setting"><span>Vibrate on result</span><input type="checkbox" id="vibrate" checked /></label>
+        <label class="setting"><span>Force Offline (privacy)</span><input type="checkbox" id="forceOffline" /></label>
+
+        <div style="margin:18px 0 8px;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--dim);font-weight:600">Voice (Free System Voices)</div>
+        <label class="setting">
+          <span>Preferred voice</span>
+          <select id="voiceSelect" style="background:var(--surface2);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:6px 8px;max-width:160px;font-size:0.85rem"></select>
+        </label>
+        <div style="display:flex;gap:8px;margin:12px 0">
+          <button id="recordVoiceBtn" class="ctrl-btn" style="flex:1">Record My Voice (3s)</button>
+          <button id="playSampleBtn" class="ctrl-btn" style="flex:1" disabled>Play Sample</button>
+        </div>
+        <p id="voiceSampleStatus" style="font-size:0.75rem;color:var(--dim);margin-bottom:8px">No personal sample recorded yet</p>
+
+        <div class="settings-info">
+          <p><strong>Note:</strong> This free version uses your device’s system voices. True AI voice cloning of <em>your</em> voice requires a paid service (ElevenLabs / OpenAI) — see PRODUCTION.md.</p>
+          <p>Best experience in Chrome / Edge. Microphone permission required.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

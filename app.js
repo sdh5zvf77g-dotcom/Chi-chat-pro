@@ -294,7 +294,39 @@
     }
   }
 
-  // ── TTS ───────────────────────────────────────────────────────────────
+  // ── TTS + Free Voice Experience ───────────────────────────────────────
+  let preferredVoiceURI = localStorage.getItem("chitchat-preferred-voice") || "";
+  let voiceSampleBlob = null;
+  try {
+    const saved = localStorage.getItem("chitchat-voice-sample");
+    if (saved) {
+      // We only keep a flag; actual blob is session-only for privacy/size
+    }
+  } catch(e) {}
+
+  function getBestVoice(lang) {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    // 1. User preferred voice if it matches language
+    if (preferredVoiceURI) {
+      const pref = voices.find(v => v.voiceURI === preferredVoiceURI);
+      if (pref && pref.lang.startsWith((lang || "en").split("-")[0])) return pref;
+    }
+
+    // 2. Exact language match, prefer local/non-default high quality
+    const langCode = (lang || "en-US").split("-")[0];
+    const candidates = voices.filter(v => v.lang.startsWith(langCode));
+    if (candidates.length) {
+      // Prefer non-Google or higher quality sounding names if possible
+      const preferred = candidates.find(v => /neural|premium|enhanced|natural/i.test(v.name)) || candidates[0];
+      return preferred;
+    }
+
+    // 3. Fallback any English or first available
+    return voices.find(v => v.lang.startsWith("en")) || voices[0];
+  }
+
   function speak(text, lang) {
     if (!window.speechSynthesis || !text) return;
     try {
@@ -303,20 +335,126 @@
       u.lang = lang || "en-US";
       u.rate = 1.0;
       u.pitch = 1.0;
-      // Prefer a matching voice if available
-      const voices = window.speechSynthesis.getVoices();
-      const match = voices.find(v => v.lang.startsWith(lang.split("-")[0]));
-      if (match) u.voice = match;
+      const best = getBestVoice(lang);
+      if (best) {
+        u.voice = best;
+        const tag = document.getElementById("voiceTag");
+        if (tag) tag.textContent = "System Voice · " + (best.name.split(" ")[0] || "Default");
+      }
       window.speechSynthesis.speak(u);
     } catch (e) {
       console.warn("TTS error", e);
     }
   }
 
+  function populateVoiceSelect() {
+    const sel = document.getElementById("voiceSelect");
+    if (!sel || !window.speechSynthesis) return;
+    const voices = window.speechSynthesis.getVoices();
+    sel.innerHTML = "";
+    const targetLang = (document.getElementById("targetLang")?.value || "en-US").split("-")[0];
+
+    // Group: matching language first
+    const matching = voices.filter(v => v.lang.startsWith(targetLang));
+    const others = voices.filter(v => !v.lang.startsWith(targetLang));
+
+    if (matching.length) {
+      const og = document.createElement("optgroup");
+      og.label = "Matching language";
+      matching.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.voiceURI;
+        opt.textContent = v.name + " (" + v.lang + ")";
+        if (v.voiceURI === preferredVoiceURI) opt.selected = true;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    }
+
+    const og2 = document.createElement("optgroup");
+    og2.label = "Other voices";
+    others.slice(0, 40).forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v.voiceURI;
+      opt.textContent = v.name + " (" + v.lang + ")";
+      if (v.voiceURI === preferredVoiceURI) opt.selected = true;
+      og2.appendChild(opt);
+    });
+    sel.appendChild(og2);
+  }
+
   // Pre-load voices
   if (window.speechSynthesis) {
     window.speechSynthesis.getVoices();
-    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+      populateVoiceSelect();
+    };
+    setTimeout(populateVoiceSelect, 500);
+  }
+
+  // Voice sample recording (local only – free approximation)
+  let mediaRecorder = null;
+  let recordedChunks = [];
+
+  function setupVoiceSampleUI() {
+    const recordBtn = document.getElementById("recordVoiceBtn");
+    const playBtn = document.getElementById("playSampleBtn");
+    const status = document.getElementById("voiceSampleStatus");
+    if (!recordBtn) return;
+
+    recordBtn.addEventListener("click", async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          voiceSampleBlob = new Blob(recordedChunks, { type: "audio/webm" });
+          stream.getTracks().forEach(t => t.stop());
+          if (playBtn) playBtn.disabled = false;
+          if (status) status.textContent = "Sample recorded (local only · not AI cloning)";
+          recordBtn.textContent = "Re-record Sample";
+        };
+        mediaRecorder.start();
+        recordBtn.textContent = "Recording… 3s";
+        recordBtn.disabled = true;
+        setTimeout(() => {
+          if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+          recordBtn.disabled = false;
+        }, 3000);
+      } catch (err) {
+        if (status) status.textContent = "Microphone needed to record sample";
+        console.warn(err);
+      }
+    });
+
+    if (playBtn) {
+      playBtn.addEventListener("click", () => {
+        if (!voiceSampleBlob) return;
+        const url = URL.createObjectURL(voiceSampleBlob);
+        const audio = new Audio(url);
+        audio.play();
+        audio.onended = () => URL.revokeObjectURL(url);
+      });
+    }
+
+    const voiceSelect = document.getElementById("voiceSelect");
+    if (voiceSelect) {
+      voiceSelect.addEventListener("change", () => {
+        preferredVoiceURI = voiceSelect.value;
+        try { localStorage.setItem("chitchat-preferred-voice", preferredVoiceURI); } catch(e) {}
+        const tag = document.getElementById("voiceTag");
+        if (tag) tag.textContent = "System Voice (custom)";
+      });
+    }
+  }
+
+  // Call after DOM ready
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupVoiceSampleUI);
+  } else {
+    setupVoiceSampleUI();
   }
 
   // ── Event bindings ────────────────────────────────────────────────────
