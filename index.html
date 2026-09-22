@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#050505" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>Chit-Chat — Real Conversations. Zero Barriers.</title>
+  <title>Chit-Chat — Talk. HUH? Understood.</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="icon.jpg" />
 </head>
@@ -23,32 +23,25 @@
       </div>
       <div class="top-actions">
         <button id="modeIndicator" class="pill online">Online</button>
-        <button id="menuBtn" class="icon-btn">☰</button>
+        <button id="menuBtn" class="icon-btn" style="display:none">☰</button>
       </div>
     </header>
-
-    <!-- Feature chips -->
-    <div class="feature-chips">
-      <span class="chip active" data-mode="face">Face-to-Face</span>
-      <span class="chip" data-mode="group">Group</span>
-      <span class="chip" data-mode="call">Call</span>
-      <span class="chip" data-mode="continuous">Continuous</span>
-    </div>
 
     <!-- Status -->
     <div class="status-row">
       <div class="status-left">
         <span id="statusDot" class="dot ready"></span>
-        <span id="statusText">Ready · Hybrid Online + Offline</span>
+        <span id="statusText">Ready · Tap a Talk button under a language</span>
       </div>
       <span id="latency" class="latency">—</span>
     </div>
 
-    <!-- Language selectors -->
-    <div class="lang-row">
-      <div class="lang-card">
-        <span class="lang-label">You speak</span>
-        <select id="sourceLang">
+    <!-- TWO LANGUAGE CARDS with their own Talk buttons -->
+    <div class="dual-lang">
+      <!-- Side A -->
+      <div class="side-card" id="sideA">
+        <div class="side-label">Person A</div>
+        <select id="langA" class="side-select">
           <option value="en-US">English</option>
           <option value="es-ES">Spanish</option>
           <option value="fr-FR">French</option>
@@ -65,11 +58,17 @@
           <option value="vi-VN">Vietnamese</option>
           <option value="id-ID">Indonesian</option>
         </select>
+        <div id="textA" class="side-text muted">Tap Talk and speak…</div>
+        <button id="talkA" class="talk-btn">🎤 Talk</button>
       </div>
-      <button id="swapBtn" class="swap">⇄</button>
-      <div class="lang-card">
-        <span class="lang-label">They hear</span>
-        <select id="targetLang">
+
+      <!-- Swap -->
+      <button id="swapBtn" class="swap-mid" title="Swap languages">⇄</button>
+
+      <!-- Side B -->
+      <div class="side-card" id="sideB">
+        <div class="side-label">Person B</div>
+        <select id="langB" class="side-select">
           <option value="es-ES">Spanish</option>
           <option value="en-US">English</option>
           <option value="fr-FR">French</option>
@@ -86,45 +85,26 @@
           <option value="vi-VN">Vietnamese</option>
           <option value="id-ID">Indonesian</option>
         </select>
+        <div id="textB" class="side-text muted">Translation appears here</div>
+        <button id="talkB" class="talk-btn">🎤 Talk</button>
       </div>
     </div>
 
-    <!-- Dual transcript -->
-    <div class="transcripts">
-      <div class="bubble you">
-        <div class="bubble-meta">You</div>
-        <div id="sourceText" class="bubble-text muted">Hold the button and speak naturally…</div>
-      </div>
-      <div class="bubble them">
-        <div class="bubble-meta">Translation · <span id="modeTag">Online</span> · <span id="voiceTag">System Voice</span></div>
-        <div id="targetText" class="bubble-text muted">Translation will appear here in real time</div>
-      </div>
-    </div>
-
-    <!-- Main action -->
-    <div class="action-zone">
-      <button id="speakBtn" class="speak">
-        <div class="speak-inner">
-          <span class="mic">🎤</span>
-          <span class="speak-label">Hold to Speak</span>
-        </div>
-      </button>
-      <p class="hint">Continuous streaming mode available · Online or Offline</p>
-    </div>
+    <!-- Hint -->
+    <p class="hint-center">Person A speaks → app translates & speaks to Person B<br>Person B speaks → app translates & speaks to Person A</p>
 
     <!-- Capability bar -->
     <div class="capability-bar">
-      <div class="cap"><span class="cap-icon">⚡</span><span>Sub-second</span></div>
+      <div class="cap"><span class="cap-icon">⚡</span><span>Fast</span></div>
       <div class="cap"><span class="cap-icon">🔒</span><span>Privacy</span></div>
       <div class="cap"><span class="cap-icon">📶</span><span>Hybrid</span></div>
-      <div class="cap"><span class="cap-icon">🗣️</span><span>Voice</span></div>
+      <div class="cap"><span class="cap-icon">🗣️</span><span>2-Way</span></div>
     </div>
 
     <!-- Bottom nav -->
     <nav class="bottom-nav">
       <button class="nav-item active" data-panel="main">Talk</button>
       <button class="nav-item" data-panel="history">History</button>
-      <button class="nav-item" data-panel="features">Features</button>
       <button class="nav-item" data-panel="settings">Settings</button>
     </nav>
 
@@ -137,29 +117,6 @@
         </div>
         <div id="historyList" class="history-list"></div>
         <button id="clearHistory" class="danger">Clear All</button>
-      </div>
-    </div>
-
-    <!-- Features panel (showcases the full 2026 vision) -->
-    <div id="featuresPanel" class="overlay hidden">
-      <div class="sheet">
-        <div class="sheet-head">
-          <h2>2026 Feature Set</h2>
-          <button class="close" data-close="featuresPanel">×</button>
-        </div>
-        <div class="feature-grid">
-          <div class="feat"><strong>✅ Hold-to-Speak</strong><span>Working now – real microphone</span></div>
-          <div class="feat"><strong>✅ Online Translation</strong><span>Working now – free public APIs</span></div>
-          <div class="feat"><strong>✅ Offline Phrases</strong><span>Working now – built-in dictionary</span></div>
-          <div class="feat"><strong>✅ Hybrid Toggle</strong><span>Working now – Online / Offline switch</span></div>
-          <div class="feat"><strong>✅ Text-to-Speech</strong><span>Working now – browser voices</span></div>
-          <div class="feat"><strong>✅ Continuous Mode</strong><span>Working now – auto-restart listening</span></div>
-          <div class="feat"><strong>🔒 Voice Cloning</strong><span>Production – needs ElevenLabs / OpenAI</span></div>
-          <div class="feat"><strong>🔒 True Live S2S</strong><span>Production – needs Realtime API</span></div>
-          <div class="feat"><strong>🔒 Group Mode</strong><span>Production – needs server</span></div>
-          <div class="feat"><strong>🔒 Call Mode</strong><span>Production – needs telephony / WebRTC</span></div>
-        </div>
-        <p class="feat-note">Green items work in this free browser version. Lock items require paid AI APIs + a small backend. See PRODUCTION.md for the exact path.</p>
       </div>
     </div>
 
@@ -180,15 +137,10 @@
           <span>Preferred voice</span>
           <select id="voiceSelect" style="background:var(--surface2);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:6px 8px;max-width:160px;font-size:0.85rem"></select>
         </label>
-        <div style="display:flex;gap:8px;margin:12px 0">
-          <button id="recordVoiceBtn" class="ctrl-btn" style="flex:1">Record My Voice (3s)</button>
-          <button id="playSampleBtn" class="ctrl-btn" style="flex:1" disabled>Play Sample</button>
-        </div>
-        <p id="voiceSampleStatus" style="font-size:0.75rem;color:var(--dim);margin-bottom:8px">No personal sample recorded yet</p>
 
         <div class="settings-info">
-          <p><strong>Note:</strong> This free version uses your device’s system voices. True AI voice cloning of <em>your</em> voice requires a paid service (ElevenLabs / OpenAI) — see PRODUCTION.md.</p>
-          <p>Best experience in Chrome / Edge. Microphone permission required.</p>
+          <p><strong>How it works:</strong> Tap the Talk button under the person who is speaking. The app listens in that language, translates, and speaks the result in the other language.</p>
+          <p>True AI voice cloning requires a paid service — see PRODUCTION.md.</p>
         </div>
       </div>
     </div>

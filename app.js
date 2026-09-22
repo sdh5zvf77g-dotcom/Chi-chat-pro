@@ -1,159 +1,141 @@
 /**
- * Chit-Chat Pro — Fully hardened 2026 browser implementation
- * Maximum reliability for speech recognition, translation, offline mode, TTS
+ * Chit-Chat — Two-way conversation mode
+ * Each language has its own Talk button.
+ * Speak on one side → translate + speak on the other side.
  */
 (() => {
   "use strict";
 
   const $ = (id) => document.getElementById(id);
 
-  // ── Elements ──────────────────────────────────────────────────────────
-  const speakBtn      = $("speakBtn");
-  const sourceLang    = $("sourceLang");
-  const targetLang    = $("targetLang");
-  const sourceText    = $("sourceText");
-  const targetText    = $("targetText");
-  const statusText    = $("statusText");
-  const statusDot     = $("statusDot");
-  const latencyEl     = $("latency");
+  const langA = $("langA");
+  const langB = $("langB");
+  const textA = $("textA");
+  const textB = $("textB");
+  const talkA = $("talkA");
+  const talkB = $("talkB");
+  const sideA = $("sideA");
+  const sideB = $("sideB");
+  const statusText = $("statusText");
+  const statusDot = $("statusDot");
+  const latencyEl = $("latency");
   const modeIndicator = $("modeIndicator");
-  const modeTag       = $("modeTag");
-  const swapBtn       = $("swapBtn");
-  const historyList   = $("historyList");
-  const autoSpeakChk  = $("autoSpeak");
-  const showLatencyChk= $("showLatency");
-  const vibrateChk    = $("vibrate");
+  const swapBtn = $("swapBtn");
+  const historyList = $("historyList");
+  const autoSpeakChk = $("autoSpeak");
+  const showLatencyChk = $("showLatency");
+  const vibrateChk = $("vibrate");
   const forceOfflineChk = $("forceOffline");
 
-  // ── State ─────────────────────────────────────────────────────────────
   let isOnline = true;
   let isListening = false;
-  let wantContinuous = false;
+  let activeSide = null; // "A" or "B"
   let recognition = null;
   let history = [];
-  try { history = JSON.parse(localStorage.getItem("chitchat-pro-history") || "[]"); } catch(e) {}
-  let currentMode = "face";
-  let lastFinalText = "";
-  let restartTimer = null;
+  try { history = JSON.parse(localStorage.getItem("chitchat-pro-history") || "[]"); } catch (e) {}
+  let preferredVoiceURI = localStorage.getItem("chitchat-preferred-voice") || "";
 
-  // Expanded offline dictionary (common travel & conversation phrases)
+  // Offline dictionary (same expanded set)
   const offlineDict = {
-    "en-es": {"hello":"hola","hi":"hola","hey":"hola","how are you":"cómo estás","how are you doing":"cómo te va","thank you":"gracias","thanks":"gracias","thank you very much":"muchas gracias","yes":"sí","no":"no","please":"por favor","goodbye":"adiós","bye":"adiós","good morning":"buenos días","good afternoon":"buenas tardes","good night":"buenas noches","i love you":"te quiero","where is":"dónde está","how much":"cuánto cuesta","help":"ayuda","water":"agua","food":"comida","bathroom":"baño","toilet":"baño","friend":"amigo","my name is":"me llamo","what is your name":"cómo te llamas","nice to meet you":"mucho gusto","excuse me":"disculpe","sorry":"lo siento","i don't understand":"no entiendo","do you speak english":"hablas inglés","i need help":"necesito ayuda","where is the bathroom":"dónde está el baño","how much does it cost":"cuánto cuesta","i am hungry":"tengo hambre","i am thirsty":"tengo sed","left":"izquierda","right":"derecha","straight":"recto","stop":"para","go":"ve","come":"ven","wait":"espera","one moment":"un momento","okay":"vale","ok":"vale"},
-    "es-en": {"hola":"hello","cómo estás":"how are you","gracias":"thank you","muchas gracias":"thank you very much","sí":"yes","no":"no","por favor":"please","adiós":"goodbye","buenos días":"good morning","buenas tardes":"good afternoon","buenas noches":"good night","te quiero":"i love you","dónde está":"where is","cuánto cuesta":"how much","ayuda":"help","agua":"water","comida":"food","baño":"bathroom","amigo":"friend","me llamo":"my name is","cómo te llamas":"what is your name","mucho gusto":"nice to meet you","disculpe":"excuse me","lo siento":"sorry","no entiendo":"i don't understand","hablas inglés":"do you speak english","necesito ayuda":"i need help","tengo hambre":"i am hungry","tengo sed":"i am thirsty","izquierda":"left","derecha":"right","recto":"straight","para":"stop","espera":"wait","un momento":"one moment","vale":"okay"},
-    "en-fr": {"hello":"bonjour","hi":"salut","thank you":"merci","thanks":"merci","yes":"oui","no":"non","please":"s'il vous plaît","goodbye":"au revoir","good morning":"bonjour","good night":"bonne nuit","i love you":"je t'aime","help":"aide","water":"eau","food":"nourriture","bathroom":"toilettes","friend":"ami","my name is":"je m'appelle","nice to meet you":"enchanté","excuse me":"excusez-moi","sorry":"désolé","i don't understand":"je ne comprends pas","where is":"où est","how much":"combien"},
-    "fr-en": {"bonjour":"hello","salut":"hi","merci":"thank you","oui":"yes","non":"no","s'il vous plaît":"please","au revoir":"goodbye","bonne nuit":"good night","je t'aime":"i love you","aide":"help","eau":"water","toilettes":"bathroom","ami":"friend","enchanté":"nice to meet you","excusez-moi":"excuse me","désolé":"sorry","je ne comprends pas":"i don't understand","où est":"where is","combien":"how much"},
-    "en-de": {"hello":"hallo","hi":"hallo","thank you":"danke","thanks":"danke","yes":"ja","no":"nein","please":"bitte","goodbye":"auf wiedersehen","good morning":"guten morgen","good night":"gute nacht","i love you":"ich liebe dich","help":"hilfe","water":"wasser","food":"essen","bathroom":"toilette","friend":"freund","sorry":"entschuldigung","i don't understand":"ich verstehe nicht"},
-    "de-en": {"hallo":"hello","danke":"thank you","ja":"yes","nein":"no","bitte":"please","auf wiedersehen":"goodbye","guten morgen":"good morning","gute nacht":"good night","ich liebe dich":"i love you","hilfe":"help","wasser":"water","essen":"food","toilette":"bathroom","freund":"friend","entschuldigung":"sorry","ich verstehe nicht":"i don't understand"},
-    "en-zh": {"hello":"你好","hi":"你好","thank you":"谢谢","yes":"是","no":"不","please":"请","goodbye":"再见","good morning":"早上好","good night":"晚安","i love you":"我爱你","help":"帮助","water":"水","food":"食物","bathroom":"洗手间","friend":"朋友","sorry":"对不起"},
-    "zh-en": {"你好":"hello","谢谢":"thank you","是":"yes","不":"no","请":"please","再见":"goodbye","早上好":"good morning","晚安":"good night","我爱你":"i love you","帮助":"help","水":"water","食物":"food","洗手间":"bathroom","朋友":"friend","对不起":"sorry"},
-    "en-ja": {"hello":"こんにちは","hi":"やあ","thank you":"ありがとう","yes":"はい","no":"いいえ","please":"お願いします","goodbye":"さようなら","good morning":"おはようございます","good night":"おやすみなさい","i love you":"愛してる","help":"助けて","water":"水","food":"食べ物","bathroom":"トイレ","friend":"友達","sorry":"ごめんなさい"},
-    "ja-en": {"こんにちは":"hello","やあ":"hi","ありがとう":"thank you","はい":"yes","いいえ":"no","お願いします":"please","さようなら":"goodbye","おはようございます":"good morning","おやすみなさい":"good night","愛してる":"i love you","助けて":"help","水":"water","食べ物":"food","トイレ":"bathroom","友達":"friend","ごめんなさい":"sorry"},
-    "en-th": {"hello":"สวัสดี","thank you":"ขอบคุณ","yes":"ใช่","no":"ไม่","please":"กรุณา","goodbye":"ลาก่อน","help":"ช่วยด้วย","water":"น้ำ","food":"อาหาร","bathroom":"ห้องน้ำ","sorry":"ขอโทษ"},
-    "th-en": {"สวัสดี":"hello","ขอบคุณ":"thank you","ใช่":"yes","ไม่":"no","กรุณา":"please","ลาก่อน":"goodbye","ช่วยด้วย":"help","น้ำ":"water","อาหาร":"food","ห้องน้ำ":"bathroom","ขอโทษ":"sorry"},
-    "en-vi": {"hello":"xin chào","thank you":"cảm ơn","yes":"vâng","no":"không","please":"làm ơn","goodbye":"tạm biệt","help":"giúp tôi","water":"nước","food":"thức ăn","bathroom":"nhà vệ sinh","sorry":"xin lỗi"},
-    "vi-en": {"xin chào":"hello","cảm ơn":"thank you","vâng":"yes","không":"no","làm ơn":"please","tạm biệt":"goodbye","giúp tôi":"help","nước":"water","thức ăn":"food","nhà vệ sinh":"bathroom","xin lỗi":"sorry"},
-    "en-id": {"hello":"halo","thank you":"terima kasih","yes":"ya","no":"tidak","please":"tolong","goodbye":"selamat tinggal","help":"tolong","water":"air","food":"makanan","bathroom":"kamar mandi","sorry":"maaf"},
-    "id-en": {"halo":"hello","terima kasih":"thank you","ya":"yes","tidak":"no","tolong":"please","selamat tinggal":"goodbye","air":"water","makanan":"food","kamar mandi":"bathroom","maaf":"sorry"},
-    "en-ko": {"hello":"안녕하세요","thank you":"감사합니다","yes":"네","no":"아니요","please":"부탁합니다","goodbye":"안녕히 가세요","help":"도와주세요","water":"물","food":"음식","sorry":"죄송합니다"},
-    "ko-en": {"안녕하세요":"hello","감사합니다":"thank you","네":"yes","아니요":"no","부탁합니다":"please","안녕히 가세요":"goodbye","도와주세요":"help","물":"water","음식":"food","죄송합니다":"sorry"},
-    "en-ru": {"hello":"привет","thank you":"спасибо","yes":"да","no":"нет","please":"пожалуйста","goodbye":"до свидания","help":"помощь","water":"вода","food":"еда","sorry":"извините"},
-    "ru-en": {"привет":"hello","спасибо":"thank you","да":"yes","нет":"no","пожалуйста":"please","до свидания":"goodbye","помощь":"help","вода":"water","еда":"food","извините":"sorry"},
-    "en-pt": {"hello":"olá","thank you":"obrigado","yes":"sim","no":"não","please":"por favor","goodbye":"adeus","help":"ajuda","water":"água","food":"comida","sorry":"desculpe"},
-    "pt-en": {"olá":"hello","obrigado":"thank you","sim":"yes","não":"no","por favor":"please","adeus":"goodbye","ajuda":"help","água":"water","comida":"food","desculpe":"sorry"},
-    "en-it": {"hello":"ciao","thank you":"grazie","yes":"sì","no":"no","please":"per favore","goodbye":"arrivederci","help":"aiuto","water":"acqua","food":"cibo","sorry":"scusa"},
-    "it-en": {"ciao":"hello","grazie":"thank you","sì":"yes","no":"no","per favore":"please","arrivederci":"goodbye","aiuto":"help","acqua":"water","cibo":"food","scusa":"sorry"}
+    "en-es": {"hello":"hola","hi":"hola","how are you":"cómo estás","thank you":"gracias","thanks":"gracias","yes":"sí","no":"no","please":"por favor","goodbye":"adiós","good morning":"buenos días","good night":"buenas noches","i love you":"te quiero","help":"ayuda","water":"agua","food":"comida","bathroom":"baño","friend":"amigo","my name is":"me llamo","nice to meet you":"mucho gusto","sorry":"lo siento","i don't understand":"no entiendo","where is the bathroom":"dónde está el baño","how much":"cuánto cuesta"},
+    "es-en": {"hola":"hello","cómo estás":"how are you","gracias":"thank you","sí":"yes","no":"no","por favor":"please","adiós":"goodbye","buenos días":"good morning","te quiero":"i love you","ayuda":"help","agua":"water","comida":"food","baño":"bathroom","amigo":"friend","mucho gusto":"nice to meet you","lo siento":"sorry","no entiendo":"i don't understand"},
+    "en-fr": {"hello":"bonjour","hi":"salut","thank you":"merci","yes":"oui","no":"non","please":"s'il vous plaît","goodbye":"au revoir","good morning":"bonjour","i love you":"je t'aime","help":"aide","water":"eau","food":"nourriture","sorry":"désolé"},
+    "fr-en": {"bonjour":"hello","salut":"hi","merci":"thank you","oui":"yes","non":"no","au revoir":"goodbye","je t'aime":"i love you","aide":"help","eau":"water","désolé":"sorry"},
+    "en-de": {"hello":"hallo","thank you":"danke","yes":"ja","no":"nein","please":"bitte","goodbye":"auf wiedersehen","good morning":"guten morgen","i love you":"ich liebe dich","help":"hilfe","water":"wasser","food":"essen"},
+    "de-en": {"hallo":"hello","danke":"thank you","ja":"yes","nein":"no","bitte":"please","auf wiedersehen":"goodbye","guten morgen":"good morning","ich liebe dich":"i love you","hilfe":"help","wasser":"water"},
+    "en-zh": {"hello":"你好","thank you":"谢谢","yes":"是","no":"不","please":"请","goodbye":"再见","good morning":"早上好","i love you":"我爱你","help":"帮助","water":"水","food":"食物"},
+    "zh-en": {"你好":"hello","谢谢":"thank you","是":"yes","不":"no","请":"please","再见":"goodbye","早上好":"good morning","我爱你":"i love you","帮助":"help","水":"water"},
+    "en-ja": {"hello":"こんにちは","thank you":"ありがとう","yes":"はい","no":"いいえ","please":"お願いします","goodbye":"さようなら","good morning":"おはようございます","i love you":"愛してる","help":"助けて","water":"水"},
+    "ja-en": {"こんにちは":"hello","ありがとう":"thank you","はい":"yes","いいえ":"no","さようなら":"goodbye","おはようございます":"good morning","愛してる":"i love you","助けて":"help","水":"water"},
+    "en-th": {"hello":"สวัสดี","thank you":"ขอบคุณ","yes":"ใช่","no":"ไม่","goodbye":"ลาก่อน","help":"ช่วยด้วย","water":"น้ำ","food":"อาหาร"},
+    "th-en": {"สวัสดี":"hello","ขอบคุณ":"thank you","ใช่":"yes","ไม่":"no","ลาก่อน":"goodbye","ช่วยด้วย":"help","น้ำ":"water"},
+    "en-vi": {"hello":"xin chào","thank you":"cảm ơn","yes":"vâng","no":"không","goodbye":"tạm biệt","help":"giúp tôi","water":"nước","food":"thức ăn"},
+    "vi-en": {"xin chào":"hello","cảm ơn":"thank you","vâng":"yes","không":"no","tạm biệt":"goodbye","giúp tôi":"help","nước":"water"},
+    "en-id": {"hello":"halo","thank you":"terima kasih","yes":"ya","no":"tidak","goodbye":"selamat tinggal","help":"tolong","water":"air","food":"makanan"},
+    "id-en": {"halo":"hello","terima kasih":"thank you","ya":"yes","tidak":"no","selamat tinggal":"goodbye","tolong":"help","air":"water"},
+    "en-ko": {"hello":"안녕하세요","thank you":"감사합니다","yes":"네","no":"아니요","goodbye":"안녕히 가세요","help":"도와주세요","water":"물","food":"음식"},
+    "ko-en": {"안녕하세요":"hello","감사합니다":"thank you","네":"yes","아니요":"no","안녕히 가세요":"goodbye","도와주세요":"help","물":"water"},
+    "en-ru": {"hello":"привет","thank you":"спасибо","yes":"да","no":"нет","goodbye":"до свидания","help":"помощь","water":"вода"},
+    "ru-en": {"привет":"hello","спасибо":"thank you","да":"yes","нет":"no","до свидания":"goodbye","помощь":"help","вода":"water"},
+    "en-pt": {"hello":"olá","thank you":"obrigado","yes":"sim","no":"não","goodbye":"adeus","help":"ajuda","water":"água"},
+    "pt-en": {"olá":"hello","obrigado":"thank you","sim":"yes","não":"no","adeus":"goodbye","ajuda":"help","água":"water"},
+    "en-it": {"hello":"ciao","thank you":"grazie","yes":"sì","no":"no","goodbye":"arrivederci","help":"aiuto","water":"acqua"},
+    "it-en": {"ciao":"hello","grazie":"thank you","sì":"yes","no":"no","arrivederci":"goodbye","aiuto":"help","acqua":"water"}
   };
 
-  // ── Helpers ───────────────────────────────────────────────────────────
   function setStatus(msg, state = "ready") {
     if (statusText) statusText.textContent = msg;
     if (statusDot) statusDot.className = "dot " + state;
   }
 
   function updateModeUI() {
-    if (!modeIndicator || !modeTag) return;
+    if (!modeIndicator) return;
     if (isOnline) {
       modeIndicator.textContent = "Online";
       modeIndicator.className = "pill online";
-      modeTag.textContent = "Online";
     } else {
       modeIndicator.textContent = "Offline";
       modeIndicator.className = "pill offline";
-      modeTag.textContent = "Offline";
     }
   }
 
   function esc(s) {
-    return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  // ── Speech Recognition (hardened continuous) ─────────────────────────
+  // ── Speech Recognition ───────────────────────────────────────────────
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   function createRecognition() {
     if (!SpeechRecognition) return null;
     const rec = new SpeechRecognition();
-    rec.continuous = false;          // we manage restarts ourselves for reliability
+    rec.continuous = false;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
 
     rec.onstart = () => {
       isListening = true;
-      if (speakBtn) {
-        speakBtn.classList.add("listening");
-        const label = speakBtn.querySelector(".speak-label");
-        if (label) label.textContent = "Listening…";
+      const btn = activeSide === "A" ? talkA : talkB;
+      const card = activeSide === "A" ? sideA : sideB;
+      if (btn) {
+        btn.classList.add("listening");
+        btn.textContent = "Listening…";
       }
-      setStatus("Listening… speak naturally", "listening");
+      if (card) card.classList.add("active-listening");
+      setStatus("Listening to Person " + activeSide + "…", "listening");
     };
 
     rec.onresult = (event) => {
-      let interim = "";
-      let final = "";
+      let interim = "", final = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const t = event.results[i][0].transcript;
         if (event.results[i].isFinal) final += t;
         else interim += t;
       }
+
+      const sourceEl = activeSide === "A" ? textA : textB;
       if (final && final.trim()) {
-        lastFinalText = final.trim();
-        if (sourceText) {
-          sourceText.textContent = lastFinalText;
-          sourceText.classList.remove("muted");
+        if (sourceEl) {
+          sourceEl.textContent = final.trim();
+          sourceEl.classList.remove("muted");
         }
-        translateAndSpeak(lastFinalText);
-      } else if (interim) {
-        if (sourceText) {
-          sourceText.textContent = interim + "…";
-          sourceText.classList.remove("muted");
-        }
+        handleSpeech(final.trim(), activeSide);
+      } else if (interim && sourceEl) {
+        sourceEl.textContent = interim + "…";
+        sourceEl.classList.remove("muted");
       }
     };
 
     rec.onerror = (e) => {
       console.warn("Speech error:", e.error);
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        setStatus("Microphone permission denied — please allow access");
-        wantContinuous = false;
-      } else if (e.error === "no-speech") {
-        setStatus("No speech detected — try again");
-      } else if (e.error === "aborted") {
-        // normal when we stop
-      } else {
-        setStatus("Recognition error: " + e.error);
-      }
-      stopListeningVisual();
+      stopListeningUI();
+      if (e.error === "not-allowed") setStatus("Microphone permission denied");
+      else if (e.error === "no-speech") setStatus("No speech detected — try again");
+      else if (e.error !== "aborted") setStatus("Error: " + e.error);
     };
 
     rec.onend = () => {
-      stopListeningVisual();
-      // Auto-restart for continuous mode
-      if (wantContinuous) {
-        clearTimeout(restartTimer);
-        restartTimer = setTimeout(() => {
-          if (wantContinuous) safeStart();
-        }, 280);
-      }
+      stopListeningUI();
     };
 
     return rec;
@@ -161,54 +143,50 @@
 
   recognition = createRecognition();
 
-  function stopListeningVisual() {
+  function stopListeningUI() {
     isListening = false;
-    if (speakBtn) {
-      speakBtn.classList.remove("listening");
-      const label = speakBtn.querySelector(".speak-label");
-      if (label) label.textContent = wantContinuous ? "Continuous On" : "Hold to Speak";
-    }
+    [talkA, talkB].forEach(btn => {
+      if (btn) {
+        btn.classList.remove("listening");
+        btn.textContent = "🎤 Talk";
+      }
+    });
+    [sideA, sideB].forEach(c => c && c.classList.remove("active-listening"));
   }
 
-  function safeStart() {
+  function startListening(side) {
     if (!recognition) {
-      setStatus("Speech recognition not available in this browser");
+      setStatus("Speech recognition not available — use Chrome or Edge");
       return;
     }
-    try {
-      recognition.lang = sourceLang ? sourceLang.value : "en-US";
-      recognition.start();
-    } catch (err) {
-      // already started — ignore
-    }
-  }
-
-  function safeStop() {
-    wantContinuous = false;
-    clearTimeout(restartTimer);
-    if (recognition) {
+    if (isListening) {
       try { recognition.stop(); } catch (e) {}
     }
-    stopListeningVisual();
+    activeSide = side;
+    const lang = side === "A" ? (langA?.value || "en-US") : (langB?.value || "es-ES");
+    recognition.lang = lang;
+    try {
+      recognition.start();
+    } catch (e) {
+      // already started
+    }
   }
 
-  // ── Translation with multiple fallbacks ───────────────────────────────
+  // ── Translation ──────────────────────────────────────────────────────
   async function translateOnline(text, fromCode, toCode) {
-    // 1. MyMemory
     try {
       const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${fromCode}|${toCode}`;
       const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       if (res.ok) {
         const data = await res.json();
-        if (data?.responseData?.translatedText && !data.responseData.translatedText.includes("MYMEMORY WARNING")) {
+        if (data?.responseData?.translatedText && !String(data.responseData.translatedText).includes("MYMEMORY WARNING")) {
           return data.responseData.translatedText;
         }
       }
-    } catch (e) { console.warn("MyMemory failed", e); }
+    } catch (e) {}
 
-    // 2. Lingva public instances
-    const lingvaHosts = ["lingva.ml", "lingva.thedaviddelta.com", "translate.plausibility.cloud"];
-    for (const host of lingvaHosts) {
+    const hosts = ["lingva.ml", "lingva.thedaviddelta.com"];
+    for (const host of hosts) {
       try {
         const url = `https://${host}/api/v1/${fromCode}/${toCode}/${encodeURIComponent(text)}`;
         const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
@@ -218,38 +196,33 @@
         }
       } catch (e) {}
     }
-
-    // 3. Last resort simple mock so the app never fails
     return `[${toCode.toUpperCase()}] ${text}`;
   }
 
   function translateOffline(text, fromCode, toCode) {
     const key = `${fromCode}-${toCode}`;
     const dict = offlineDict[key];
-    if (!dict) return `[Offline · no pack] ${text}`;
-
+    if (!dict) return `[Offline] ${text}`;
     const lower = text.toLowerCase().trim();
     if (dict[lower]) return dict[lower];
-
-    // Phrase-level replace
     let result = text;
-    // sort longer keys first so multi-word phrases match first
     const entries = Object.entries(dict).sort((a, b) => b[0].length - a[0].length);
     for (const [k, v] of entries) {
-      const re = new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi");
-      result = result.replace(re, v);
+      result = result.replace(new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi"), v);
     }
     return result !== text ? result : `[Offline] ${text}`;
   }
 
-  async function translateAndSpeak(text) {
-    if (!text || !text.trim()) return;
+  async function handleSpeech(text, fromSide) {
+    // fromSide spoke → translate into the OTHER language and speak it there
+    const fromLang = fromSide === "A" ? langA.value : langB.value;
+    const toLang   = fromSide === "A" ? langB.value : langA.value;
+    const fromCode = fromLang.split("-")[0];
+    const toCode   = toLang.split("-")[0];
+    const targetEl = fromSide === "A" ? textB : textA;
 
-    const fromCode = (sourceLang?.value || "en-US").split("-")[0];
-    const toCode   = (targetLang?.value || "es-ES").split("-")[0];
     const useOffline = !isOnline || (forceOfflineChk && forceOfflineChk.checked);
-
-    setStatus(useOffline ? "Translating offline…" : "Translating online…", "working");
+    setStatus(useOffline ? "Translating offline…" : "Translating…", "working");
     const t0 = performance.now();
 
     let translated;
@@ -258,73 +231,48 @@
         ? translateOffline(text, fromCode, toCode)
         : await translateOnline(text, fromCode, toCode);
     } catch (e) {
-      translated = `[Error] ${text}`;
-      console.error(e);
+      translated = text;
     }
 
     const ms = Math.round(performance.now() - t0);
-
-    if (targetText) {
-      targetText.textContent = translated;
-      targetText.classList.remove("muted");
+    if (targetEl) {
+      targetEl.textContent = translated;
+      targetEl.classList.remove("muted");
     }
-    if (showLatencyChk?.checked && latencyEl) {
-      latencyEl.textContent = `~${ms}ms`;
-    }
+    if (showLatencyChk?.checked && latencyEl) latencyEl.textContent = `~${ms}ms`;
 
-    // History
     history.unshift({
-      from: text,
-      to: translated,
-      source: sourceLang?.value || "en",
-      target: targetLang?.value || "es",
+      from: text, to: translated,
+      source: fromLang, target: toLang,
       time: new Date().toLocaleTimeString(),
-      mode: useOffline ? "offline" : "online"
+      mode: useOffline ? "offline" : "online",
+      side: fromSide
     });
     if (history.length > 100) history.length = 100;
-    try { localStorage.setItem("chitchat-pro-history", JSON.stringify(history)); } catch(e) {}
+    try { localStorage.setItem("chitchat-pro-history", JSON.stringify(history)); } catch (e) {}
 
-    setStatus(useOffline ? "Done · Offline pack" : "Done · Online quality", "ready");
-
+    setStatus("Done · Spoken in the other language", "ready");
     if (vibrateChk?.checked && navigator.vibrate) {
-      try { navigator.vibrate(30); } catch(e) {}
+      try { navigator.vibrate(30); } catch (e) {}
     }
-    if (autoSpeakChk?.checked) {
-      speak(translated, targetLang?.value || "es-ES");
+
+    // Speak the translation in the OPPOSITE language
+    if (autoSpeakChk?.checked !== false) {
+      speak(translated, toLang);
     }
   }
 
-  // ── TTS + Free Voice Experience ───────────────────────────────────────
-  let preferredVoiceURI = localStorage.getItem("chitchat-preferred-voice") || "";
-  let voiceSampleBlob = null;
-  try {
-    const saved = localStorage.getItem("chitchat-voice-sample");
-    if (saved) {
-      // We only keep a flag; actual blob is session-only for privacy/size
-    }
-  } catch(e) {}
-
+  // ── TTS ──────────────────────────────────────────────────────────────
   function getBestVoice(lang) {
-    const voices = window.speechSynthesis.getVoices();
+    const voices = window.speechSynthesis?.getVoices() || [];
     if (!voices.length) return null;
-
-    // 1. User preferred voice if it matches language
     if (preferredVoiceURI) {
       const pref = voices.find(v => v.voiceURI === preferredVoiceURI);
-      if (pref && pref.lang.startsWith((lang || "en").split("-")[0])) return pref;
+      if (pref) return pref;
     }
-
-    // 2. Exact language match, prefer local/non-default high quality
-    const langCode = (lang || "en-US").split("-")[0];
-    const candidates = voices.filter(v => v.lang.startsWith(langCode));
-    if (candidates.length) {
-      // Prefer non-Google or higher quality sounding names if possible
-      const preferred = candidates.find(v => /neural|premium|enhanced|natural/i.test(v.name)) || candidates[0];
-      return preferred;
-    }
-
-    // 3. Fallback any English or first available
-    return voices.find(v => v.lang.startsWith("en")) || voices[0];
+    const code = (lang || "en").split("-")[0];
+    const match = voices.filter(v => v.lang.startsWith(code));
+    return match.find(v => /neural|premium|enhanced|natural/i.test(v.name)) || match[0] || voices[0];
   }
 
   function speak(text, lang) {
@@ -334,195 +282,82 @@
       const u = new SpeechSynthesisUtterance(text);
       u.lang = lang || "en-US";
       u.rate = 1.0;
-      u.pitch = 1.0;
       const best = getBestVoice(lang);
-      if (best) {
-        u.voice = best;
-        const tag = document.getElementById("voiceTag");
-        if (tag) tag.textContent = "System Voice · " + (best.name.split(" ")[0] || "Default");
-      }
+      if (best) u.voice = best;
       window.speechSynthesis.speak(u);
-    } catch (e) {
-      console.warn("TTS error", e);
-    }
+    } catch (e) {}
   }
 
-  function populateVoiceSelect() {
-    const sel = document.getElementById("voiceSelect");
-    if (!sel || !window.speechSynthesis) return;
-    const voices = window.speechSynthesis.getVoices();
-    sel.innerHTML = "";
-    const targetLang = (document.getElementById("targetLang")?.value || "en-US").split("-")[0];
-
-    // Group: matching language first
-    const matching = voices.filter(v => v.lang.startsWith(targetLang));
-    const others = voices.filter(v => !v.lang.startsWith(targetLang));
-
-    if (matching.length) {
-      const og = document.createElement("optgroup");
-      og.label = "Matching language";
-      matching.forEach(v => {
-        const opt = document.createElement("option");
-        opt.value = v.voiceURI;
-        opt.textContent = v.name + " (" + v.lang + ")";
-        if (v.voiceURI === preferredVoiceURI) opt.selected = true;
-        og.appendChild(opt);
-      });
-      sel.appendChild(og);
-    }
-
-    const og2 = document.createElement("optgroup");
-    og2.label = "Other voices";
-    others.slice(0, 40).forEach(v => {
-      const opt = document.createElement("option");
-      opt.value = v.voiceURI;
-      opt.textContent = v.name + " (" + v.lang + ")";
-      if (v.voiceURI === preferredVoiceURI) opt.selected = true;
-      og2.appendChild(opt);
-    });
-    sel.appendChild(og2);
-  }
-
-  // Pre-load voices
   if (window.speechSynthesis) {
     window.speechSynthesis.getVoices();
     window.speechSynthesis.onvoiceschanged = () => {
       window.speechSynthesis.getVoices();
       populateVoiceSelect();
     };
-    setTimeout(populateVoiceSelect, 500);
   }
 
-  // Voice sample recording (local only – free approximation)
-  let mediaRecorder = null;
-  let recordedChunks = [];
-
-  function setupVoiceSampleUI() {
-    const recordBtn = document.getElementById("recordVoiceBtn");
-    const playBtn = document.getElementById("playSampleBtn");
-    const status = document.getElementById("voiceSampleStatus");
-    if (!recordBtn) return;
-
-    recordBtn.addEventListener("click", async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        recordedChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-        mediaRecorder.onstop = () => {
-          voiceSampleBlob = new Blob(recordedChunks, { type: "audio/webm" });
-          stream.getTracks().forEach(t => t.stop());
-          if (playBtn) playBtn.disabled = false;
-          if (status) status.textContent = "Sample recorded (local only · not AI cloning)";
-          recordBtn.textContent = "Re-record Sample";
-        };
-        mediaRecorder.start();
-        recordBtn.textContent = "Recording… 3s";
-        recordBtn.disabled = true;
-        setTimeout(() => {
-          if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
-          recordBtn.disabled = false;
-        }, 3000);
-      } catch (err) {
-        if (status) status.textContent = "Microphone needed to record sample";
-        console.warn(err);
-      }
+  function populateVoiceSelect() {
+    const sel = $("voiceSelect");
+    if (!sel || !window.speechSynthesis) return;
+    const voices = window.speechSynthesis.getVoices();
+    sel.innerHTML = "";
+    voices.slice(0, 50).forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v.voiceURI;
+      opt.textContent = `${v.name} (${v.lang})`;
+      if (v.voiceURI === preferredVoiceURI) opt.selected = true;
+      sel.appendChild(opt);
     });
-
-    if (playBtn) {
-      playBtn.addEventListener("click", () => {
-        if (!voiceSampleBlob) return;
-        const url = URL.createObjectURL(voiceSampleBlob);
-        const audio = new Audio(url);
-        audio.play();
-        audio.onended = () => URL.revokeObjectURL(url);
-      });
-    }
-
-    const voiceSelect = document.getElementById("voiceSelect");
-    if (voiceSelect) {
-      voiceSelect.addEventListener("change", () => {
-        preferredVoiceURI = voiceSelect.value;
-        try { localStorage.setItem("chitchat-preferred-voice", preferredVoiceURI); } catch(e) {}
-        const tag = document.getElementById("voiceTag");
-        if (tag) tag.textContent = "System Voice (custom)";
-      });
-    }
+    sel.onchange = () => {
+      preferredVoiceURI = sel.value;
+      try { localStorage.setItem("chitchat-preferred-voice", preferredVoiceURI); } catch (e) {}
+    };
   }
+  setTimeout(populateVoiceSelect, 400);
 
-  // Call after DOM ready
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setupVoiceSampleUI);
-  } else {
-    setupVoiceSampleUI();
-  }
-
-  // ── Event bindings ────────────────────────────────────────────────────
-  // Hold-to-speak
-  if (speakBtn) {
-    speakBtn.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      wantContinuous = false;
-      safeStart();
-    });
+  // ── Event bindings ───────────────────────────────────────────────────
+  // Hold or click Talk A
+  if (talkA) {
+    talkA.addEventListener("pointerdown", (e) => { e.preventDefault(); startListening("A"); });
     ["pointerup", "pointerleave", "pointercancel"].forEach(evt => {
-      speakBtn.addEventListener(evt, () => {
-        if (isListening) {
-          try { recognition.stop(); } catch(e) {}
+      talkA.addEventListener(evt, () => {
+        if (isListening && activeSide === "A") {
+          try { recognition.stop(); } catch (e) {}
         }
       });
     });
   }
 
-  // Mode indicator toggle Online/Offline
+  // Hold or click Talk B
+  if (talkB) {
+    talkB.addEventListener("pointerdown", (e) => { e.preventDefault(); startListening("B"); });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(evt => {
+      talkB.addEventListener(evt, () => {
+        if (isListening && activeSide === "B") {
+          try { recognition.stop(); } catch (e) {}
+        }
+      });
+    });
+  }
+
+  // Swap languages + texts
+  if (swapBtn) {
+    swapBtn.addEventListener("click", () => {
+      const tmpLang = langA.value;
+      langA.value = langB.value;
+      langB.value = tmpLang;
+      const tmpText = textA.textContent;
+      textA.textContent = textB.textContent;
+      textB.textContent = tmpText;
+    });
+  }
+
+  // Online / Offline
   if (modeIndicator) {
     modeIndicator.addEventListener("click", () => {
       isOnline = !isOnline;
       updateModeUI();
-      setStatus(isOnline ? "Online mode — highest quality" : "Offline mode — privacy first");
-    });
-  }
-
-  // Feature chips
-  document.querySelectorAll(".chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
-      chip.classList.add("active");
-      currentMode = chip.dataset.mode || "face";
-
-      if (currentMode === "continuous") {
-        wantContinuous = true;
-        setStatus("Continuous mode ON — keep talking");
-        safeStart();
-        if (speakBtn) {
-          const label = speakBtn.querySelector(".speak-label");
-          if (label) label.textContent = "Continuous On";
-        }
-      } else {
-        wantContinuous = false;
-        safeStop();
-        const labels = {
-          face: "Face-to-Face mode ready",
-          group: "Group mode (demo UI) — up to 25 people",
-          call: "Call mode (demo UI) — phone/video translation"
-        };
-        setStatus(labels[currentMode] || "Mode ready");
-      }
-    });
-  });
-
-  // Swap
-  if (swapBtn) {
-    swapBtn.addEventListener("click", () => {
-      if (!sourceLang || !targetLang) return;
-      const tmp = sourceLang.value;
-      sourceLang.value = targetLang.value;
-      targetLang.value = tmp;
-      if (sourceText && targetText) {
-        const t = sourceText.textContent;
-        sourceText.textContent = targetText.textContent;
-        targetText.textContent = t;
-      }
+      setStatus(isOnline ? "Online mode" : "Offline mode");
     });
   }
 
@@ -535,8 +370,6 @@
       if (panel === "history") {
         renderHistory();
         $("historyPanel")?.classList.remove("hidden");
-      } else if (panel === "features") {
-        $("featuresPanel")?.classList.remove("hidden");
       } else if (panel === "settings") {
         $("settingsPanel")?.classList.remove("hidden");
       }
@@ -544,22 +377,16 @@
   });
 
   document.querySelectorAll("[data-close]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.close;
-      if (id) $(id)?.classList.add("hidden");
-    });
+    btn.addEventListener("click", () => $(btn.dataset.close)?.classList.add("hidden"));
   });
-
   document.querySelectorAll(".overlay").forEach(ov => {
-    ov.addEventListener("click", (e) => {
-      if (e.target === ov) ov.classList.add("hidden");
-    });
+    ov.addEventListener("click", (e) => { if (e.target === ov) ov.classList.add("hidden"); });
   });
 
   if ($("clearHistory")) {
     $("clearHistory").addEventListener("click", () => {
       history = [];
-      try { localStorage.removeItem("chitchat-pro-history"); } catch(e) {}
+      try { localStorage.removeItem("chitchat-pro-history"); } catch (e) {}
       renderHistory();
     });
   }
@@ -567,7 +394,7 @@
   function renderHistory() {
     if (!historyList) return;
     if (!history.length) {
-      historyList.innerHTML = "<p style='color:var(--dim);padding:12px 0'>No conversations yet. Start talking!</p>";
+      historyList.innerHTML = "<p style='color:var(--dim);padding:12px 0'>No conversations yet.</p>";
       return;
     }
     historyList.innerHTML = history.map(h => `
@@ -575,40 +402,16 @@
         <div class="from">${esc(h.from)}</div>
         <div class="to">${esc(h.to)}</div>
         <div style="font-size:0.65rem;color:var(--dim);margin-top:4px">
-          ${esc(h.time)} · ${esc(h.mode)} · ${esc((h.source||"").split("-")[0])} → ${esc((h.target||"").split("-")[0])}
+          ${esc(h.time)} · Person ${esc(h.side)} · ${esc(h.mode)}
         </div>
       </div>`).join("");
   }
 
-  // Keyboard support
-  document.addEventListener("keydown", (e) => {
-    if (e.code === "Space" && e.target === document.body) {
-      e.preventDefault();
-      if (!isListening) safeStart();
-    }
-  });
-  document.addEventListener("keyup", (e) => {
-    if (e.code === "Space" && isListening) {
-      try { recognition.stop(); } catch(e) {}
-    }
-  });
-
   // Init
   updateModeUI();
   if (!SpeechRecognition) {
-    setStatus("Speech recognition limited — use Chrome or Edge for full power");
+    setStatus("Speech limited — use Chrome or Edge");
   } else {
-    setStatus("Ready · Hybrid Online + Offline · Highest quality");
-  }
-
-  // Force offline checkbox
-  if (forceOfflineChk) {
-    forceOfflineChk.addEventListener("change", () => {
-      if (forceOfflineChk.checked) {
-        isOnline = false;
-        updateModeUI();
-        setStatus("Force Offline enabled — privacy mode");
-      }
-    });
+    setStatus("Ready · Tap a Talk button under a language");
   }
 })();
